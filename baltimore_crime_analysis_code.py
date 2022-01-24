@@ -1,4 +1,5 @@
 #Analysis done over baltimore's crime
+#Code and analysis as prepared by Kolten Safron
 
 #####################################################
 #Libary's 
