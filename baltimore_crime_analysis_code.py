@@ -1,19 +1,5 @@
-#looks like crime decreasing throughout the years - maybe do a quick research and tie to baltimore economy data? hopefully increasing or something? or is population decreasing so rate staying the same?
-#should we add population in, and do a crime rate calc per year?
-#will need to adjsut anything looking at days/years/months as the data for 2016 stops at Nov 12/2016 so missing a month and half
-#address other missing values and outliers in data if any
-#maybe look at crime by area?
-#create model to predict occurences of crime based on day, hour, etc and maybe neighborhood
-#tie in over arching economic data for the US? has it been doing better recently or later
-#tie in with Baltimore Football games
-#weather?
+#Analysis done over baltimore's crime
 
-#add in lags
-#add in pay day/cycle
-#add in holidays
-#????? EDA addressing as same even though NOv 2016 and Dec missing /half
-#????? ensure to adjust for only half of Nov 2016 and no Dec 2016
-#????? will probably want to use averages for any plotting as this should solve the issue
 #####################################################
 #Libary's 
 #####################################################
@@ -324,7 +310,7 @@ crimes.Neighborhood.isna().sum()
 #--------------------------------
 #Location
 #--------------------------------
-#???????????? to look into rest
+
 #converting all locations to lower case to avoid any potential case issues
 crimes['Location']= crimes['Location'].str.lower()
 
@@ -674,7 +660,6 @@ for i in crimes['Description'].unique():
 #no NA to worry about
 crimes.year.isna().sum()
 
-#????????????????????? drop due to Nov missing a month and a half
 #we can see that crime took a large decrease in 2016 however it spiked up hard in 2017 - up due to Trump taking office? outrage?. I looked up most notable news from Baltimore in 2017 and nothing was to large to warrant this increase
 #We can also see come 2020 and 2021 crime decreased significantly compared to the normal - this is likely due to COVID and people staying in more
 #Also note the large drop in 2022 - this is do to 2022 only including partial data right now
@@ -808,7 +793,6 @@ for i in crimes['month'].unique():
 #week_of_year
 #--------------------------------
 
-#????????????????? feel like we should just delete this
 #no NA to worry about
 crimes.week_of_year.isna().sum()
 
@@ -816,7 +800,6 @@ crimes['week_of_year'].value_counts()
 temp = crimes[crimes['week_of_year'] == 53]
 
 
-#?????? large fall off after the 52 - a few data points show up as 53rd week
 #Doesn't appear to be any trend that is to apprent, just the same seasonality as noted above when looking at months. 
 #Is a bit more obvious and severe drop off in crime here when winter first comes around towards the end of the year
 plt.plot(crimes.groupby(['week_of_year']).week_of_year.count())
@@ -1180,275 +1163,6 @@ def plot_features(booster, figsize):
     fig, ax = plt.subplots(1,1,figsize=figsize)
     return plot_importance(booster=booster, ax=ax)
 plot_features(model, (10,14))
-
-
-
-
-
-
-
-
-
-
-########################################################
-########################################################
-########################################################
-#other work not used
-########################################################
-########################################################
-########################################################
-
-
-
-
-
-#%matplotlib qt makes plot show outside of GUI
-#%matplotlib
-
-############
-#distances
-#############
-
-#converts all location coordinates to a tuple so it can be used in the distance calculation
-#in crime data the following rows do not
-crimes['Location 1'].isnull().sum() #there is 1619 of NA values in location. We could attempt to fill these in but as there is pretty few just removed them
-crimes.dropna(subset=['Location 1'], inplace = True) #removed all NA's in location 1 column
-crimes.reset_index(inplace = True)
-
-
-for i in crimes.index:
-    location = crimes['Location 1'][i]
-    location = location[1:-1]
-    location = location.replace(' ','')
-    location = tuple(map(float, location.split(',')))
-    crimes.at[i, 'Location 1'] = location
-
-
-for i in cctv.index:
-    location = cctv['Location 1'][i]
-    location = location[1:-1]
-    location = location.replace(' ','')
-    location = tuple(map(float, location.split(',')))
-    cctv.at[i, 'Location 1'] = location
-    
-quit()
-    
-    
-#mapping
-
-map = folium.Map(location = [39.290996, -76.621074], zoom_start = 14, control_scale=True)
-
-crimes = crimes[crimes['Description'] == 'LARCENY']
-
-for i in cctv.index:
-     folium.Marker(
-        location= cctv.at[i, 'Location 1'],
-        radius=5,
-        popup= cctv.at[i, 'cameraNumber'],
-        color='red',
-        fill=True,
-        fill_color='red'
-        ).add_to(map)   
-
-
-for i in cctv.index:
-     folium.Circle(
-        location= cctv.at[i, 'Location 1'],
-        radius=50,
-        popup= cctv.at[i, 'cameraNumber'],
-        color='black',
-        fill=False,
-        ).add_to(map)   
-     
- 
-
-for i in crimes.index:
-     folium.Circle(
-        location= crimes.at[i, 'Location 1'],
-        radius=2,
-        #popup= cctv.at[i, 'cameraNumber'],
-        color='red',
-        fill=False,
-        ).add_to(map)   
- 
-
-for i in cctv.index:
-     folium.CircleMarker(
-        location= cctv.at[i, 'Location 1'],
-        radius=20,
-        popup= cctv.at[i, 'cameraNumber'],
-        color='blue',
-        fill=True,
-        fill_color = 'blue'
-        ).add_to(map)  
-    
-map.add_child(FastMarkerCluster(crimes['Location 1'].values.tolist()))
-
-map.add_child(HeatMap(crimes['Location 1'].values.tolist()))
-
-
-map.save('map.html')
-webbrowser.open('map.html')
-
-
-
-    
-
-#hs.haversine(loc1, loc2) #default is KM
-from haversine import Unit
-#hs.haversine(loc1, loc2, unit = Unit.METERS) #changes to M
-
-########################################################
-########################################################
-########################################################
-#trashhhhh
-########################################################
-########################################################
-########################################################
-
-crimes.CrimeCode.nunique()
-crimes.CrimeCode.value_counts()
-#crimes.CrimeCode.value_counts().iloc[:10].sort_values().plot(kind="barh", title = "Types of Crimes") #shows top 10
-
-
-crimes.Description.nunique()
-crimes.Description.value_counts()
-#crimes.Description.value_counts().sort_values().plot(kind="barh", title = "Types of Crimes") #shows all
-
-crimes['Inside/Outside'].nunique()
-crimes['Inside/Outside'].value_counts()
-
-crimes.Weapon.nunique()
-crimes.Weapon.value_counts()
-
-crimes.Post.nunique()
-crimes.Post.value_counts()
-
-crimes.Neighborhood.nunique()
-crimes.Neighborhood.value_counts()
-
-crimes.District.nunique()
-crimes.District.value_counts()
-
-
-
-##############
-#adding in month and year
-###############
-
-crimes['date_time_type'] = pd.to_datetime(crimes['CrimeDate']) 
-
-for i in crimes.index:
-    crimes.at[i, 'month'] = int(crimes.at[i,'CrimeDate'][:2])
-    crimes.at[i, 'year'] = int(crimes.at[i,'CrimeDate'][6:])
-    crimes.at[i,'day_of_month'] = int(crimes.at[i,'CrimeDate'][3:5])
-    crimes.at[i,'hour_of_day'] = int(crimes.at[i,'CrimeTime'][:2])
-    
-crimes['week_of_year'] = crimes['date_time_type'].dt.week 
-crimes['weekday'] = crimes['date_time_type'].dt.weekday #0 is Monday and 6 is Sunday
-
-
-##############
-#data cleaning 
-###############
-
-#hour_of_day
-crimes['hour_of_day'].value_counts() #appears to be 1 crime that occured on the 24 hour which shouldnt happen as the clock stops at 23:59
-crimes.index[crimes['hour_of_day'] == 24].tolist() #apperas to be in index 198664, going to compare to other indexes before and after to see try and decide where it should go
-crimes[198660:198668] #times appear to follow somewhat chronologically with the index. As such looking at these rows, as this time is dated for Sept 24 and the other times for Sept 24 are towards midnight, this time must also of been at midnight on the 24th. As such adjusted it to be 23 hours.
-crimes['hour_of_day'][198664] = 23
-sorted(crimes['hour_of_day'].unique()) #all appears fixed now
-
-#month
-crimes['month'].value_counts() #no issues, all appears appropriate
-
-#year
-crimes['year'].value_counts() #no issues, all appears appropriate
-
-#day_of_month
-crimes['day_of_month'].value_counts() #no issues, all appears appropriate
-
-#week_of_year
-crimes['week_of_year'].value_counts() #no issues, all appears appropriate
-
-#weekday
-crimes['weekday'].value_counts()
-
-
-
-quit()
-
-crimes = crimes[crimes['date_time_type'] < '2016-01-01']
-
-plt.plot(crimes.groupby(['year']).year.count())
-plt.title('Crimes per Year')
-plt.xlabel('Year')
-plt.ylabel('Crime Occurences')
-plt.xticks(crimes['year'].unique())
-plt.show()
-
-plt.plot(crimes.groupby(['month']).month.count())
-plt.title('Crimes per Month')
-plt.xlabel('Month')
-plt.ylabel('Crime Occurences')
-plt.show()
-
-plt.plot(crimes.groupby(['day_of_month']).day_of_month.count())
-plt.title('Crimes per Day of Month')
-plt.xlabel('Day of Month')
-plt.ylabel('Crime Occurences')
-plt.show()
-
-plt.plot(crimes.groupby(['hour_of_day']).hour_of_day.count())
-plt.title('Crimes per Hour of Day')
-plt.xlabel('Hour of Day')
-plt.ylabel('Crime Occurences')
-plt.show()
-
-plt.plot(crimes.groupby(['week_of_year']).week_of_year.count())
-plt.title('Crimes per Week of Year')
-plt.xlabel('Week of Year')
-plt.ylabel('Crime Occurences')
-plt.show()
-
-
-plt.plot(crimes.groupby(['weekday']).weekday.count())
-plt.title('Crimes per Weekday')
-plt.xlabel('Weekday (0 = Monday)')
-plt.ylabel('Crime Occurences')
-plt.show()
-
-
-#by weekday by time
-temp = crimes.groupby(['weekday','hour_of_day']).weekday.count()
-temp = pd.DataFrame(temp)
-temp.columns = ['occurences']
-temp.reset_index(inplace = True)
-
-
-
-for i in range(0,7):
-    plt.plot(
-        ((temp[temp['weekday'] == i]).drop(labels = 'weekday', axis = 1))['hour_of_day'],
-        ((temp[temp['weekday'] == i]).drop(labels = 'weekday', axis = 1))['occurences'],
-        label = 'day %d' % i
-        )
-    plt.title('Crimes per Hour Per Weekday ( 0 = Monday)')
-    plt.xlabel('Hour of Day')
-    plt.ylabel('Crime Occurences')
-    plt.xticks(crimes['hour_of_day'].unique())
-    plt.legend()
-    #plt.show()
-
-
-
-quit()
-#crime by day of month
-#crime by hour of day
-
-crimes.year.value_counts()
-crimes.month.value_counts()
-
 
 
 
