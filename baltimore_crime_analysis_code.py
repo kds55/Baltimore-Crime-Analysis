@@ -1,5 +1,3 @@
-#Analysis done over baltimore's crime
-#Code and analysis as prepared by Kolten Safron
 
 #####################################################
 #Libary's 
@@ -9,18 +7,10 @@ import numpy as np
 import pandas as pd 
 import matplotlib.pylab as plt
 from sklearn.preprocessing import LabelEncoder
-from itertools import product
 import datetime
 from datetime import datetime
 from datetime import date
 import math
-from sklearn.linear_model import LinearRegression
-import haversine as hs
-import folium
-import webbrowser
-
-from folium.plugins import FastMarkerCluster
-from folium.plugins import HeatMap
 
 #####################################################
 #Loading data and some pre-work done over it
@@ -54,8 +44,8 @@ crimes = crimes_2016Novprior.append(crimes_2017forward, ignore_index = True)
 #dropping unneeded column
 crimes.drop(['Total Incidents'], axis = 1, inplace = True)
 
-#del crimes_2017forward
-#del crimes_2016Novprior
+
+
 
 
 #--------------------------------
@@ -97,6 +87,8 @@ del unemployment
 #misc data
 #--------------------------------
 #data set consisting of locatoins of CCTV's in Baltimore - https://data.world/baltimore/baltimore-cctv-locations
+#unused data set - Originally was going to use it as crime proximity to nearest cctv camera (idea being cctv camera should either catch more crimes or deter crime from happening there)
+#may come back to this and work it into the analysis as it would be an interesting analysis
 cctv = pd.read_csv ('CCTV_Locations.csv') 
   
 #data set I made consisting of the Baltimore Raven's football schedule (NFL team) from the 2011 through 2020 seasons
@@ -137,6 +129,36 @@ crimes['weekday'] = crimes['date_time_type'].dt.weekday #0 is Monday and 6 is Su
 
 
 #--------------------------------
+#Addressing missing data for Nov & Dec 2016
+#--------------------------------
+#as the data set is missing data for middle of Nov to the end of Dec we will want to address this for the EDA (removed for final modeling)
+#crimes for 2016 were in a comparable range to 2018 throughout the year so used 2018 as a proxy for 2016 Nov and Dec
+#2016 data stops on Nov 11 - as such Nov 12 onwards needs to be picked up
+temp = crimes.groupby(['year','month','day_of_month']).month.count()
+temp = pd.DataFrame(temp)
+temp.columns = ['occurences']
+temp.reset_index(inplace  = True)
+
+temp = crimes[((crimes['year'] == 2017) & (crimes['month'] > 10) & (crimes['day_of_month'] > 11)) |  ((crimes['year'] == 2017) & (crimes['month'] == 12) )]
+temp['year'] = 2016
+
+
+for i in temp.index:
+    temp.at[i,'CrimeDate'] = temp.at[i,'CrimeDate'][:9] + '6'
+
+temp['date_time_type'] = pd.to_datetime(temp['CrimeDate']) 
+
+
+#readding in weekday and week of year as the 2016 values are different then 2018
+temp['week_of_year'] = temp['date_time_type'].dt.week 
+temp['weekday'] = temp['date_time_type'].dt.weekday #0 is Monday and 6 is Sunday
+
+crimes = crimes.append(temp, ignore_index = True)
+
+
+
+
+#--------------------------------
 #combining all data into one
 #--------------------------------
 
@@ -148,7 +170,7 @@ crimes = pd.merge(crimes, football_games, how = 'left')
 crimes = pd.merge(crimes, baltimore_city_data, how = 'outer')
 
 
-del football_games
+#del football_games
 
 
 #####################################################
@@ -311,6 +333,7 @@ crimes.Neighborhood.isna().sum()
 #--------------------------------
 #Location
 #--------------------------------
+#there was a lot of data to cleanup and got a good start, but definetely could revist and do more work over it to get it cleaner yet. 
 
 #converting all locations to lower case to avoid any potential case issues
 crimes['Location']= crimes['Location'].str.lower()
@@ -478,10 +501,10 @@ del area_list
 
 
 
-quit()
 
 
-#####################################################
+
+####################################################
 #Explority Data Analysis
 #####################################################
 
@@ -496,7 +519,7 @@ crimes.CrimeCode.value_counts().iloc[:15].sort_values().plot(kind="barh", title 
 
 #the top 4 crime codes cover 48% of all the crimes that occured
 #this is impressive given there is 80 crime codes in all, so 5% of the crime codes almost covers 50% of the crimes
-crimes.CrimeCode.value_counts().iloc[:4].sum()  / len(crimes)
+crimes.CrimeCode.value_counts().iloc[:15].sum()  / len(crimes)
 crimes.CrimeCode.nunique()
 
 
@@ -537,9 +560,9 @@ temp2 = temp[temp['Inside/Outside'] == 'O']
 
 plt.bar(temp1['Description'], temp1['Occurences'], label = 'Inside')
 plt.bar(temp2['Description'], temp2['Occurences'], bottom = temp1['Occurences'] , label = 'Outside')
-plt.title('Crimes per Inside vs Outside')
-plt.xlabel('Crime Occurences')
-plt.ylabel('Crime')
+plt.title('Crimes - Inside vs Outside')
+plt.xlabel('Number of Crimes')
+plt.ylabel('Crime Description')
 plt.xticks(rotation = 90)
 plt.legend()
 
@@ -579,6 +602,8 @@ crimes.District.isna().sum()
 #based on this it appears the east side of the city has more crime then the west
 crimes[crimes['District'].notna()] ['District'].value_counts().sort_values().plot(kind="barh", title = "Crimes by District") 
 
+#breakdown by district 
+crimes[crimes['District'].notna()] ['District'].value_counts()
 
 #--------------------------------
 #Neighborhood
@@ -591,6 +616,9 @@ crimes.Neighborhood.isna().sum()
 crimes[crimes['Neighborhood'].notna()] ['Neighborhood'].value_counts().iloc[:].sort_values().plot(kind="barh", title = "Crimes by Neighborhood") 
 crimes[crimes['Neighborhood'].notna()] ['Neighborhood'].value_counts().iloc[:25].sort_values().plot(kind="barh", title = "Crimes by Neighborhood") 
 
+crimes.Neighborhood.value_counts().iloc[:25].sum()  / len(crimes)
+
+crimes.Neighborhood.nunique()
 
 #--------------------------------
 #month
@@ -605,12 +633,11 @@ crimes.month.isna().sum()
 plt.plot(crimes.groupby(['month']).month.count())
 plt.title('Crimes by Month')
 plt.xlabel('Month')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.show()
 
 #for additional analysis lets see if the amount of crimes inside vs outside is different throughout the year
 #from this we can see that the decrease in winter crimes is primairly due to lower outside crimes as the inside crimes stay relatively consistent
-
 temp = crimes
 temp = temp[temp['Inside/Outside'].notna()]
 temp = temp.groupby(['month','Inside/Outside']).Description.count()
@@ -625,9 +652,9 @@ temp2 = temp[temp['Inside/Outside'] == 'O']
 
 plt.bar(temp1['month'], temp1['Occurences'], label = 'Inside')
 plt.bar(temp2['month'], temp2['Occurences'], bottom = temp1['Occurences'] , label = 'Outside')
-plt.title('Crimes per Inside vs Outside')
-plt.xlabel('Crime Occurences')
-plt.ylabel('Crime')
+plt.title('Crimes - Inside vs Outside')
+plt.xlabel('Month')
+plt.ylabel('Crimes')
 plt.xticks(rotation = 90)
 plt.legend()
 
@@ -646,11 +673,11 @@ for i in crimes['Description'].unique():
         ((temp[temp['Description'] == i]).drop(labels = 'Description', axis = 1))['month'],
         ((temp[temp['Description'] == i]).drop(labels = 'Description', axis = 1))['occurences'],
         label = 'Crime %s' % i)
-    plt.title('Crimes per Month Per Description')
+    plt.title('Crimes per Month by Description')
     plt.xlabel('Month')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['month'].unique())
-    plt.legend()
+    #plt.legend()
     
   
     
@@ -658,16 +685,18 @@ for i in crimes['Description'].unique():
 #year
 #--------------------------------
 
+#as 2022 is only half of January, decided to remove all of 2022 from our data set
+crimes= crimes[crimes['year'] < 2022]
+
 #no NA to worry about
 crimes.year.isna().sum()
 
-#we can see that crime took a large decrease in 2016 however it spiked up hard in 2017 - up due to Trump taking office? outrage?. I looked up most notable news from Baltimore in 2017 and nothing was to large to warrant this increase
+#we can see that crime spiked up hard in 2017 - up due to Trump taking office? outrage?. I looked up most notable news from Baltimore in 2017 and nothing was to large to warrant this increase
 #We can also see come 2020 and 2021 crime decreased significantly compared to the normal - this is likely due to COVID and people staying in more
-#Also note the large drop in 2022 - this is do to 2022 only including partial data right now
 plt.plot(crimes.groupby(['year']).year.count())
 plt.title('Crimes by Year')
 plt.xlabel('Year')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.show()
 
 
@@ -679,17 +708,19 @@ temp = crimes.groupby(['month','year']).year.count()
 temp = pd.DataFrame(temp)
 temp.columns = ['occurences']
 temp.reset_index(inplace = True)
+#temp = temp[temp['year'] > 2014]
+#temp = temp[temp['year'] < 2018]
 
 for i in crimes['year'].unique():
     plt.plot(
         ((temp[temp['year'] == i]).drop(labels = 'year', axis = 1))['month'],
         ((temp[temp['year'] == i]).drop(labels = 'year', axis = 1))['occurences'],
-        label = 'Crime %s' % i)
-    plt.title('Crimes per Month Per Year')
+        label =  i)
+    plt.title('Crimes per Month by Year')
     plt.xlabel('Month')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['month'].unique())
-    plt.legend()
+    #plt.legend()
 
 #lastly lets check to see if the crime types have become more or less common - any trend
 #nothing to notable up till 2020 where it fell off due to COVID
@@ -705,9 +736,9 @@ for i in crimes['Description'].unique():
         label = 'Crime %s' % i)
     plt.title('Crimes per Year Per Description')
     plt.xlabel('Year')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['year'].unique())
-    plt.legend()
+    #plt.legend()
 
 
 
@@ -723,7 +754,7 @@ crimes.day_of_month.isna().sum()
 plt.plot(crimes.groupby(['day_of_month']).day_of_month.count())
 plt.title('Crimes per Day of Month')
 plt.xlabel('Day of Month')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.xticks(range(2,31,2))
 plt.show()
 
@@ -736,9 +767,8 @@ plt.show()
 #appears to be 1 crime that occured on the 24 hour which shouldnt happen as the clock stops at 23:59
 crimes['hour_of_day'].value_counts() 
 crimes.index[crimes['hour_of_day'] == 24].tolist() #apperas to be in index 198664, going to compare to other indexes before and after to see try and decide where it should go
-crimes[198660:198668] #times appear to follow somewhat chronologically with the index. As such looking at these rows, as this time is dated for Sept 24 and the other times for Sept 24 are towards midnight, this time must also of been at midnight on the 24th. As such adjusted it to be 23 hours.
-crimes['hour_of_day'][198664] = 23
-crimes['hour_of_day'][198661] = 23 #?????? not sure why this one is showing up as well as 24
+crimes[205415:205421] #times appear to follow somewhat chronologically with the index. As such looking at these rows, as this time is dated for Sept 24 and the other times for Sept 24 are towards midnight, this time must also of been at midnight on the 24th. As such adjusted it to be 23 hours.
+crimes['hour_of_day'][205418] = 23
 sorted(crimes['hour_of_day'].unique()) #all appears fixed now
 
 #no NA to worry about
@@ -749,8 +779,7 @@ crimes.hour_of_day.isna().sum()
 plt.plot(crimes.groupby(['hour_of_day']).hour_of_day.count())
 plt.title('Crimes per Hour of Day')
 plt.xlabel('Hour of Day')
-plt.ylabel('Crime Occurences')
-
+plt.ylabel('Number of Crimes')
 plt.show()
 
 #looking at this we can definetly notice that certain crimes occur more depending on the time of the day.
@@ -764,12 +793,12 @@ for i in crimes['Description'].unique():
     plt.plot(
         ((temp[temp['Description'] == i]).drop(labels = 'Description', axis = 1))['hour_of_day'],
         ((temp[temp['Description'] == i]).drop(labels = 'Description', axis = 1))['occurences'],
-        label = 'Crime %s' % i)
-    plt.title('Crimes per Hour of Day Per Description')
+        label = i)
+    plt.title('Crimes per Hour of Day by Description')
     plt.xlabel('Hour of Day')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['hour_of_day'].unique())
-    #plt.legend()
+    plt.legend()
     
     
 #looking at this we can see that the crimes follow the same pattern throughout the hours of day regardless of season or month
@@ -785,7 +814,7 @@ for i in crimes['month'].unique():
         label = 'Crime %s' % i)
     plt.title('Crimes per Hour of Day Per Month')
     plt.xlabel('Hour of Day')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['hour_of_day'].unique())
     plt.legend()
 
@@ -794,22 +823,15 @@ for i in crimes['month'].unique():
 #week_of_year
 #--------------------------------
 
+#when looking at the data a large amount of them seem to fall into the 53rd week of the year
+#it doesn't appear to be consistently applied as some of the first days of each year are labeled as the 53rd week
+#becuase of this confusion this will be removed from the final model and no EDA will be done over it
+
 #no NA to worry about
 crimes.week_of_year.isna().sum()
 
 crimes['week_of_year'].value_counts() 
 temp = crimes[crimes['week_of_year'] == 53]
-
-
-#Doesn't appear to be any trend that is to apprent, just the same seasonality as noted above when looking at months. 
-#Is a bit more obvious and severe drop off in crime here when winter first comes around towards the end of the year
-plt.plot(crimes.groupby(['week_of_year']).week_of_year.count())
-plt.title('Crimes per Week of Year')
-plt.xlabel('Week of Year')
-plt.ylabel('Crime Occurences')
-plt.xticks(range(3,52,4))
-plt.show()
-
 
 
 #--------------------------------
@@ -833,7 +855,7 @@ temp['weekday'].sum() - ( (0+1+2+3+4+5+6) * 52 * 10 + (3 * 12) )
 plt.plot(crimes.groupby(['weekday']).weekday.count())
 plt.title('Crimes per Weekday')
 plt.xlabel('Weekday (0 = Monday)')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.xticks(crimes['weekday'].unique())
 plt.show()
 
@@ -849,12 +871,12 @@ for i in crimes['Description'].unique():
     plt.plot(
         ((temp[temp['Description'] == i]).drop(labels = 'Description', axis = 1))['weekday'],
         ((temp[temp['Description'] == i]).drop(labels = 'Description', axis = 1))['occurences'],
-        label = 'Crime %s' % i)
+        label =  i)
     plt.title('Crimes per Weekday Per Description')
     plt.xlabel('Weekday')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['weekday'].unique())
-    #plt.legend()
+    plt.legend()
 
 
 #looking at each districts crime breakdown per weekday we can see that some districts dont follow the pattern as closely
@@ -864,17 +886,17 @@ temp = pd.DataFrame(temp)
 temp.columns = ['occurences']
 temp.reset_index(inplace = True)
 
+temp.dropna(inplace = True)
 for i in crimes['District'].unique():
     plt.plot(
         ((temp[temp['District'] == i]).drop(labels = 'District', axis = 1))['weekday'],
         ((temp[temp['District'] == i]).drop(labels = 'District', axis = 1))['occurences'],
-        label = 'Crime %s' % i)
+        label = i)
     plt.title('Crimes per Weekday Per District')
     plt.xlabel('Weekday')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['weekday'].unique())
-    #plt.legend()
-
+    plt.legend()
 
 
 
@@ -904,7 +926,7 @@ for i in crimes['month'].unique():
         label = 'Crime %s' % i)
     plt.title('Crimes per Weekday Per Month')
     plt.xlabel('Weekday')
-    plt.ylabel('Crime Occurences')
+    plt.ylabel('Number of Crimes')
     plt.xticks(crimes['weekday'].unique())
     plt.legend()
 
@@ -915,8 +937,7 @@ temp = crimes[crimes['home/away'].notna()]
 temp = temp[temp['District'] == 'CENTRAL']
 temp['home/away'].value_counts()
 
-#I believe its safe to say there is no correlation between criem and football at this point
-
+#there doesn't appear to be a lot of correlation here however when the final model was built, this did have a fair weighting on it so left it in
 
 #--------------------------------
 #population
@@ -942,7 +963,7 @@ plt.show()
 plt.plot(crimes.groupby(['year']).year.count())
 plt.title('Crimes by Year')
 plt.xlabel('Year')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.show()
 
 plt.plot(baltimore_city_data['year'], baltimore_city_data['crime_per_capita'])
@@ -969,7 +990,7 @@ plt.show()
 plt.plot(crimes.groupby(['year']).year.count())
 plt.title('Crimes by Year')
 plt.xlabel('Year')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.show()
 
 
@@ -1003,7 +1024,7 @@ plt.show()
 plt.plot(crimes.groupby(['year']).year.count())
 plt.title('Crimes by Year')
 plt.xlabel('Year')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.show()
 
 #--------------------------------
@@ -1023,11 +1044,15 @@ plt.show()
 plt.plot(crimes.groupby(['year']).year.count())
 plt.title('Crimes by Year')
 plt.xlabel('Year')
-plt.ylabel('Crime Occurences')
+plt.ylabel('Number of Crimes')
 plt.show()
 
+del temp
+del football_games
+del baltimore_city_data
+del cctv
 
-
+quit()
 
 #####################################################
 #Modeling
@@ -1037,39 +1062,48 @@ plt.show()
 #data clean up
 #--------------------------------
 
+#eliminating values with NA - a lot missing. Could do some more work around the locations or street addresses to fill in a few more but given the amount of work, left as is.
+df = crimes[(crimes['Neighborhood'].notna() ) & ( crimes['District'].notna() )]
 
-temp = crimes[crimes['District'].notna()]
-temp = crimes[crimes['Neighborhood'].notna()]
-columns_to_drop = ['Inside/Outside', 'Weapon','season', 'regular/playoff', 'home/away', 'win/loss', 'Location 1', 
-                   'CrimeDate', 'CrimeTime', 'Location','Post', 'date_time_type', 'week_of_year']
-temp.drop(columns_to_drop, axis = 1, inplace = True)
+#adding in "no_game" for all days with no football game
+df['regular/playoff'].fillna('no_game', inplace = True)
+df['home/away'].fillna('no_game', inplace = True)
+df['win/loss'].fillna('no_game', inplace = True)
 
-temp['median_income_diff'] = temp['us_median_income'] - temp['bal_median_income']
-#????????? temp['crime_per_capita'] = temp['occurences'] /temp['population'] * 100 could add as a lag?
+#adding in a differeince in US vs Baltimore income
+df['median_income_diff'] = df['us_median_income'] - df['bal_median_income']
 
-#bunch to eliminate. Got rid of. Should either try and populate those years or just eliminate those years and reduce data pool size
-temp.isna().sum()
-columns_to_drop = ['population', 'bal_median_income', 'us_median_income', 'unemployment_rate', 'poverty_population',
-                   'poverty_percent', 'median_income_diff']
-temp.drop(columns_to_drop, axis = 1, inplace = True)
+#label conding all remaining string/object data types that will be used in the final model
+df = df.astype({"Neighborhood":'category', "District":'category'})
+df['Neighborhood'] = LabelEncoder().fit_transform( df.Neighborhood )
+df['District'] = LabelEncoder().fit_transform( df.District )
 
-temp = temp.astype({"Neighborhood":'category', "District":'category'})
-temp['Neighborhood'] = LabelEncoder().fit_transform( temp.Neighborhood )
-temp['District'] = LabelEncoder().fit_transform( temp.District )
+df['regular/playoff'] = LabelEncoder().fit_transform( df['regular/playoff'] )
+df['home/away'] = LabelEncoder().fit_transform( df['home/away'] )
+df['win/loss'] = LabelEncoder().fit_transform( df['win/loss'] )
+
+#removing missing 2016 data points filled above for EDA - Nov 12 to Dec 31 in 2016
+df = df[ (df['date_time_type'] < '2016-11-12'   ) | (df['date_time_type'] >= '2017-01-01'   )]
 
 
 #--------------------------------
 #model on the month level
 #--------------------------------
-temp = temp.groupby(['month','year', 'Neighborhood', 'District']).year.count()
+
+temp = df
+#temp = temp.groupby(['month','year', 'Neighborhood', 'District', ]).year.count()
+temp = temp.groupby(['month','year', 'Neighborhood', 'District', 'population', 'bal_median_income', 'us_median_income', 'unemployment_rate', 'poverty_population','poverty_percent', 'median_income_diff']).year.count()
 temp = pd.DataFrame(temp)
 temp.columns = ['occurences']
 temp.reset_index(inplace = True)
 temp = temp[temp['year']<2020]
+temp = temp[temp['year']>2012]
 
 #average crimes per neighborhood
 temp['occurences'].mean() 
-#model produces a MAE of 1.16 where as the total average crimes is 13.4 - not bad?
+#model produces a MAE of 1.16 where as the total average crimes is 13.4 
+#including the baltimore city data it drops the model to 0.62277 against the total average of 13.3. This is a good amount better
+#should probable add in a early stop though as model appears to be overfitting compared to the validation set
 
 
 from xgboost import XGBRegressor
@@ -1080,7 +1114,6 @@ X_train = data[(data.year <= 2019) & (data.month < 11)].drop(['occurences'], axi
 Y_train = data[(data.year <= 2019) & (data.month < 11)]['occurences']
 X_valid = data[(data.year >= 2019) & (data.month >= 11)].drop(['occurences'], axis=1)
 Y_valid = data[(data.year >= 2019) & (data.month >= 11)]['occurences']
-#X_test = data[data.date_block_num == 34].drop(['item_cnt_month'], axis=1)
 Y_train = Y_train.clip(0, 20)
 Y_valid = Y_valid.clip(0, 20)
 del data
@@ -1097,10 +1130,9 @@ model = XGBRegressor(
 model.fit(
     X_train, 
     Y_train, 
-    eval_metric="rmse", #rmse or mae
+    eval_metric="mae", #rmse or mae
     eval_set=[(X_train, Y_train), (X_valid, Y_valid)], 
-    verbose=True)#, 
-    #early_stopping_rounds = 20)
+    verbose=True)
 
 
 
@@ -1115,17 +1147,23 @@ plot_features(model, (10,14))
 #model on the day level
 #--------------------------------
 
+temp = df
 #group by day - could add in crime description as well and crime code? maybe to granular at that point
-temp = temp.groupby(['month','year', 'Neighborhood', 'District', 'day_of_month']).year.count()
+#temp = temp.groupby(['month','year', 'Neighborhood', 'District', 'day_of_month']).year.count()
+temp = temp.groupby(['month','year', 'Neighborhood', 'District', 'day_of_month', 'population', 'bal_median_income', 'us_median_income', 'unemployment_rate', 'poverty_population','poverty_percent', 'median_income_diff', 'regular/playoff', 'home/away', 'win/loss']).year.count()
+
 temp = pd.DataFrame(temp)
 temp.columns = ['occurences']
 temp.reset_index(inplace = True)
 temp = temp[temp['year']<2020]
+temp = temp[temp['year']>2012]
 
 #average crimes per neighborhood
 temp['occurences'].mean() 
-#model produces a MAE of 0.47 where as the total average crimes is 1.57. This doesn't feel to good
-
+#model produces a MAE of 0.47 where as the total average crimes is 1.57. Feel like this needs to be improved.
+#including baltimore city data produces a MAE of 0.43 where as the total average crimes is 1.56 - not much improvement
+#rsme got marginally better from a 0.70621 to  0.63457  
+#should probable add in a early stop though as model appears to be overfitting compared to the validation set
 
 from xgboost import XGBRegressor
 from matplotlib.pylab import rcParams
@@ -1135,7 +1173,6 @@ X_train = data[(data.year <= 2019) & (data.month < 11)].drop(['occurences'], axi
 Y_train = data[(data.year <= 2019) & (data.month < 11)]['occurences']
 X_valid = data[(data.year >= 2019) & (data.month >= 11)].drop(['occurences'], axis=1)
 Y_valid = data[(data.year >= 2019) & (data.month >= 11)]['occurences']
-#X_test = data[data.date_block_num == 34].drop(['item_cnt_month'], axis=1)
 Y_train = Y_train.clip(0, 20)
 Y_valid = Y_valid.clip(0, 20)
 del data
@@ -1154,8 +1191,7 @@ model.fit(
     Y_train, 
     eval_metric="mae", 
     eval_set=[(X_train, Y_train), (X_valid, Y_valid)], 
-    verbose=True)#, 
-    #early_stopping_rounds = 20)
+    verbose=True)
 
 
 
@@ -1164,9 +1200,4 @@ def plot_features(booster, figsize):
     fig, ax = plt.subplots(1,1,figsize=figsize)
     return plot_importance(booster=booster, ax=ax)
 plot_features(model, (10,14))
-
-
-
-
-
 
